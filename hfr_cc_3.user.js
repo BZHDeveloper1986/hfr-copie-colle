@@ -4,9 +4,9 @@
 // @version       1.6.0
 // @namespace     forum.hardware.fr
 // @description   Colle les données du presse-papiers et les traite si elles sont reconnues.
-// @icon          https://github.com/BZHDeveloper1986/hfr/blob/main/hfr-logo.png?raw=true
-// @downloadURL   https://github.com/BZHDeveloper1986/hfr/raw/refs/heads/main/hfr_cc_2.user.js
-// @updateURL     https://github.com/BZHDeveloper1986/hfr/raw/refs/heads/main/hfr_cc_2.user.js
+// @icon          https://github.com/BZHDeveloper1986/hfr-copie-colle/blob/main/hfr-logo.png?raw=true
+// @downloadURL   https://github.com/BZHDeveloper1986/hfr-copie-colle/raw/refs/heads/main/hfr_cc_3.user.js
+// @updateURL     https://github.com/BZHDeveloper1986/hfr-copie-colle/raw/refs/heads/main/hfr_cc_3.user.js
 // @require       https://unpkg.com/video.js/dist/video.min.js
 // @include       https://forum.hardware.fr/*
 // @noframes
