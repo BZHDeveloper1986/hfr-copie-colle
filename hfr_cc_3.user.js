@@ -274,6 +274,9 @@ class Social {
 		builder.append (`${obj.text}\n`);
 		obj.videos.forEach (v => {
 			var u = new URL (v.source);
+			if (v.hasOwnProperty ("info"))
+				for (const [key,value] of Object.entries (v["info"]))
+					u.searchParams.append (key, value);
 			if (v.isGif)
 				u.searchParams.append ("gif", "true");
 			u.searchParams.append ("hfr-cc-mime-type", v.content_type);
@@ -290,6 +293,22 @@ class Social {
 		}
 		builder.append ("[/quote]\n");
 		return builder.toString();
+	}
+
+	static getFirstVideo (url) {
+		return new Promise ((resolve, reject) => {
+			Hfr.fetch ("https://bzhdev18.alwaysdata.net/social/?url=" + encodeURIComponent (url)).then (rep => rep.json()).then (data => {
+				if (data.error)
+					reject (url);
+				else if (data.videos == null || data.videos.length == 0)
+					reject (url);
+				else
+					resolve (data.videos[0]);
+			}).catch (e => {
+				console.log (e);
+				reject (url);
+			});
+		});
 	}
 
 	static load (url) {
@@ -1498,10 +1517,18 @@ var observer = new MutationObserver ((mutations, observer) => {
 		}
 		if (link.firstElementChild == null || link.firstElementChild.nodeName.toLowerCase() != "img")
 			return;
-		if (href.indexOf ("https://x.com/i/videos/") == 0) {
-			var frame = document.createElement ("iframe");
-			frame.src = href;
-			link.parentNode.replaceChild (frame, link);
+		if (u.searchParams.has ("hfr-cc-threads")) {
+			var video = link.createPlayer (false);
+			Social.getFirstVideo (u.searchParams.get ("hfr-cc-threads")).then (obj => {
+				video.player.src ({ src : obj.source, type : obj.content_type });
+			})
+		}
+		else if (href.indexOf ("https://video.twimg.com") == 0) {
+				var mime = u.searchParams.get ("hfr-cc-mime-type");
+				var video = link.createPlayer (u.searchParams.get("gif") == "true");
+			Utils.convertVideoURL (href).then (datauri => {
+				video.player.src ({ src : datauri, type : mime  });
+			});
 		}
 		else if (u.searchParams.has ("hfr-cc-mime-type")) {
 			var mime = u.searchParams.get ("hfr-cc-mime-type");
@@ -1533,10 +1560,19 @@ document.querySelectorAll (".cLink").forEach (function (link) {
 	}
 	if (link.firstElementChild == null || link.firstElementChild.nodeName.toLowerCase() != "img")
 		return;
-	if (href.indexOf ("https://x.com/i/videos/") == 0) {
-		var frame = document.createElement ("iframe");
-		frame.src = href;
-		link.parentNode.replaceChild (frame, link);
+	if (u.searchParams.has ("hfr-cc-threads")) {
+			var video = link.createPlayer (false);
+		Social.getFirstVideo (u.searchParams.get ("hfr-cc-threads")).then (obj => {
+			console.log ("recharge video");
+			video.player.src ({ src : obj.source, type : obj.content_type });
+		})
+	}
+	else if (href.indexOf ("https://video.twimg.com") == 0) {
+			var mime = u.searchParams.get ("hfr-cc-mime-type");
+			var video = link.createPlayer (u.searchParams.get("gif") == "true");
+		Utils.convertVideoURL (href).then (datauri => {
+			video.player.src ({ src : datauri, type : mime  });
+		});
 	}
 	else if (u.searchParams.has ("hfr-cc-mime-type")) {
 		var mime = u.searchParams.get ("hfr-cc-mime-type");

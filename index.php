@@ -3,7 +3,7 @@
 use Dom\HTMLDocument;
 
 class Utils {
-  public static function download_string (string $url, array $options = [
+  public static function download_data (string $url, array $options = [
     "user-agent" => "Mozilla/5.0 (Macintosh; Intel Mac OS X 10.8; rv:21.0) Gecko/20100101 Firefox/21.0",
     "headers" => []
   ]) {
@@ -19,6 +19,10 @@ class Utils {
     $res = curl_exec($ch);
     unset ($ch);
     return $res;
+  }
+
+  public static function upload (string $dest, $data) {
+
   }
 }
 class Embed {
@@ -100,6 +104,8 @@ class Video {
   public string $content_type = "";
 
   public bool $is_gif = false;
+
+  public array $info = [];
 
   public function __toString() {
     return json_encode($this, JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE);
@@ -278,7 +284,7 @@ class Reddit extends Social {
   public static function load (string $url) {
     $matches = Expression::reddit()->exec($url);
     $uri = "https://www.reddit.com/{$matches['slug']}/.json";
-    $json = Utils::download_string($uri);
+    $json = Utils::download_data($uri);
     $data = json_decode($json, true);
     return new Reddit ($data[0]["data"]["children"][0]["data"]);
   }
@@ -350,7 +356,7 @@ class Mastodon extends Social {
     $matches = Expression::mastodon()->exec($url);
     if ($matches == null)
       $matches = Expression::truthSocial()->exect ($url);
-    $json = Utils::download_string("https://{$matches['instance']}/api/v1/statuses/{$matches['id']}");
+    $json = Utils::download_data("https://{$matches['instance']}/api/v1/statuses/{$matches['id']}");
     if ($json === false)
       throw new Exception ("erreur dans l'acquisition Mastodon");
     $data = json_decode($json, true);
@@ -380,6 +386,7 @@ class Threads extends Social {
       $video->source = $v->querySelector ("source")->getAttribute ("src");
       $video->content_type = "video/mp4";
       $video->poster = "https://i.imgur.com/juJpPUDm.png";
+      $video->info["hfr-cc-threads"] = $link;
       array_push ($this->videos, $video);
     }
   }
@@ -409,7 +416,7 @@ class Threads extends Social {
   }
 
   public static function load (string $url) {
-    $html = Utils::download_string("{$url}/embed");
+    $html = Utils::download_data("{$url}/embed");
     if ($html === false)
       throw new Exception ("service Threads indisponible");
     $doc = HTMLDocument::createFromString ($html, LIBXML_NOERROR);
@@ -561,17 +568,27 @@ class Twitter extends Social {
     if (array_key_exists("mediaDetails", $data) && is_array ($data["mediaDetails"])) {
       foreach ($data["mediaDetails"] as $media) {
         if ($media["type"] == "video") {
-          $video = new Video();
-          $video->poster = $media["media_url_https"];
-          $video->content_type = "text/html";
-          $video->source = "https://x.com/i/videos/" . $data["id_str"];
-          array_push ($this->videos, $video);
+          $variants = $media["video_info"]["variants"];
+          usort ($variants, function ($a, $b) {
+            if (!array_key_exists("bitrate", $a) ||!array_key_exists("bitrate", $b))
+              return 0;
+            return $a["bitrate"] - $b["bitrate"];
+          });
+          for ( $i = 0; $i < count ($variants); $i++)
+            if ($variants[$i]["content_type"] == "video/mp4") {
+              $video = new Video();
+              $video->poster = $media["media_url_https"];
+              $video->content_type = "video/mp4";
+              $video->source = $variants[$i]["url"];
+              array_push ($this->videos, $video);
+              break;
+            }
         }
         if ($media["type"] == "animated_gif") {
           $video = new Video();
           $video->is_gif = true;
           $video->poster = $media["media_url_https"];
-          $video->source = $media["video_info"]["variants"][0].url;
+          $video->source = $media["video_info"]["variants"][0]["url"];
           $video->content_type = "video/mp4";
           array_push ($this->videos, $video);
         }
@@ -597,7 +614,7 @@ class Twitter extends Social {
 
   public static function load ($url) {
     $matches = Expression::twitter()->exec($url);
-    $json = Utils::download_string ("https://cdn.syndication.twimg.com/tweet-result?token=43l77nyjhwo&id={$matches['id']}");
+    $json = Utils::download_data ("https://cdn.syndication.twimg.com/tweet-result?token=43l77nyjhwo&id={$matches['id']}");
     if ($json === false)
       throw new Exception ("service Twitter indisponible");
     $data = json_decode ($json, true);
