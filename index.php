@@ -162,6 +162,16 @@ class Expression {
   }
 }
 
+class Poll {
+  public int $votes = 0;
+
+  public array $options = [];
+
+  public function __toString() {
+    return json_encode($this, JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE);
+  }
+}
+
 class Social {
   public array $images  = [];
 
@@ -171,6 +181,8 @@ class Social {
   public string $info = "";
   public string $icon = "";
   public string $text = "";
+
+  public Poll $poll;
 
   public Embed $embed;
 
@@ -308,6 +320,12 @@ class Mastodon extends Social {
       $e->image->width = $data["card"]["width"];
       $e->image->height = $data["card"]["height"];
       $this->embed = $e;
+    }
+    if (array_key_exists("poll", $data) && $data["poll"] != null) {
+      $this->poll = new Poll();
+      $this->poll->votes = $data["poll"]["votes_count"];
+      foreach ($data["poll"]["option"] as $opt)
+        $this->poll->options[$opt["title"]] = $opt["votes_count"];
     }
     if (array_key_exists ("media_attachments", $data) && $data["media_attachments"] != null)
       foreach ($data["media_attachments"] as $media) {
@@ -552,18 +570,34 @@ class Twitter extends Social {
     if (array_key_exists("quoted_tweet", $data))
       $this->quote = new Twitter ($data["quoted_tweet"]);
     if (array_key_exists("card", $data)) {
-      $vals = $data["card"]["binding_values"];
-      $this->embed = new Embed();
-      $this->embed->uri = $vals["card_url"]["string_value"];
-      $this->embed->site = $vals["domain"]["string_value"];
-      $this->embed->title = Social::format ($vals["title"]["string_value"]);
-      $this->embed->description = Social::format ($vals["description"]["string_value"]);
-      $img_url = "";
-      if (array_key_exists("player_url", $vals))
-        $img_url = $vals["player_image"]["image_value"]["url"];
-      else
-        $img_url = $vals["thumbnail_image"]["image_value"]["url"];
-      $this->embed->image = Image::load ($img_url);
+      $preg = '/poll(?<count>\d)choice\w+/';
+      $matches = 0;
+      if (preg_match($preg, $data["card"]["name"], $matches)) {
+        $this->poll = new Poll();
+        $count = (int)$matches["count"];
+        $votes = 0;
+        for ($i = 0; $i < $count; $i++) {
+          $label = $data["card"]["binding_values"]["choice". (1 + $i) ."_label"]["string_value"];
+          $v = (int)$data["card"]["binding_values"]["choice". (1 + $i) ."_count"]["string_value"];
+          $votes += $v;
+          $this->poll->options[$label] = $v;
+        }
+        $this->poll->votes = $votes;
+      }
+      else {
+        $vals = $data["card"]["binding_values"];
+        $this->embed = new Embed();
+        $this->embed->uri = $vals["card_url"]["string_value"];
+        $this->embed->site = $vals["domain"]["string_value"];
+        $this->embed->title = Social::format ($vals["title"]["string_value"]);
+        $this->embed->description = Social::format ($vals["description"]["string_value"]);
+        $img_url = "";
+        if (array_key_exists("player_url", $vals))
+          $img_url = $vals["player_image"]["image_value"]["url"];
+        else
+          $img_url = $vals["thumbnail_image"]["image_value"]["url"];
+        $this->embed->image = Image::load ($img_url);
+      }
     }
     if (array_key_exists("mediaDetails", $data) && is_array ($data["mediaDetails"])) {
       foreach ($data["mediaDetails"] as $media) {
@@ -628,7 +662,14 @@ class Twitter extends Social {
 <?php
   header('Content-Type: application/json; charset=utf-8');
   
-  if (!isset($_GET["url"])) {
+  if (isset($_GET["text"])) {
+    $text = $_GET["text"];
+    $text = preg_replace_callback('/https?:\/\/(www\.)?[-a-zA-Z0-9@:%._\+~#=]{1,256}\.[a-zA-Z0-9()]{1,6}\b([-a-zA-Z0-9()@:%_\+.~#?&\/\/=]*)/', function ($m) {
+     return "[url={$m[0]}][b]{$m[0]}[/b][/url]";
+    }, $text);
+    echo "{ \"text\" : \"" . Social::format ($text) . "\" }";
+  }
+  else if (!isset($_GET["url"])) {
     echo "{ \"error\" : \"'url' parameter is missing\" }";
   }
   else if (isset ($_GET["embed"]) && $_GET["embed"]  == "true") {

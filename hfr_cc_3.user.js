@@ -1,7 +1,7 @@
 // ==UserScript==
 // @author        BZHDeveloper, roger21
 // @name          [HFR] Copié/Collé v3
-// @version       1.6.0
+// @version       1.6.1
 // @namespace     forum.hardware.fr
 // @description   Colle les données du presse-papiers et les traite si elles sont reconnues.
 // @icon          https://github.com/BZHDeveloper1986/hfr-copie-colle/blob/main/hfr-logo.png?raw=true
@@ -20,7 +20,7 @@
 // ==/UserScript==
 
 // Historique
-// 1.2            on repart de la v2.
+// 1.6.1          ajout des sondages si disponible.
 
 console.log ("Merci pour tout Marc 🕊️");
 
@@ -291,6 +291,12 @@ class Social {
 			builder.append (`[url=${obj.embed.uri}][img=${obj.embed.image.thumb_width},${obj.embed.image.thumb_height}]${obj.embed.image.source}[/img][/url]`);
 			builder.append (`[/quote]`);
 		}
+		if (obj.poll) {
+			for (const [k,v] of Object.entries (obj.poll.options)) {
+				var pct = (100 * v / obj.poll.votes).toFixed (2);
+				builder.append (`[*] ${k} (${pct} %)\n`);
+			}
+		}
 		builder.append ("[/quote]\n");
 		return builder.toString();
 	}
@@ -318,6 +324,20 @@ class Social {
 					reject (url);
 				else
 					resolve (Social.objectToString (data));
+			}).catch (e => {
+				console.log (e);
+				reject (url);
+			});
+		});
+	}
+
+	static format (text) {
+		return new Promise ((resolve, reject) => {
+			Hfr.fetch ("https://bzhdev18.alwaysdata.net/social/?format=" + text).then (rep => rep.json()).then (data => {
+				if (data.error)
+					reject (url);
+				else
+					resolve (data.text);
 			}).catch (e => {
 				console.log (e);
 				reject (url);
@@ -1034,7 +1054,12 @@ class Utils {
 			(async () => {
 				Social.load (text).then (str => resolve (str)).catch (e => {
 					Embed.load (text).then (embed => resolve (embed.toString()))
-						.catch (err => { reject (text); });
+						.catch (err => {
+							Social.format (text).then (txt => resolve (txt)).catch (error => {
+								console.log (error);
+								reject (text);
+							});
+						});
 				});
 			})();
 		});
@@ -1081,7 +1106,12 @@ class Utils {
 
 				Social.load (text).then (str => resolve (str)).catch (e => {
 					Embed.load (text).then (embed => resolve (embed.toString()))
-						.catch (err => { console.log (err); reject (text); });
+						.catch (err => {
+							Social.format (text).then (txt => resolve (txt)).catch (error => {
+								console.log (error);
+								reject (text);
+							});
+						});
 				});
 			})();
 		});
