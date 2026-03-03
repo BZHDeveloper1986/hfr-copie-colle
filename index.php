@@ -41,6 +41,9 @@ class Embed {
   }
 
   public static function load ($url) {
+    if (!file_exists ($url)) {
+      throw new Exception("le fichier n'existe pas");
+    }
     $html = file_get_contents($url);
     if ($html == null)
       throw new Exception ("le ficher n'est pas HTML");

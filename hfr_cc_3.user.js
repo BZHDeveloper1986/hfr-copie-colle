@@ -335,12 +335,12 @@ class Social {
 		return new Promise ((resolve, reject) => {
 			Hfr.fetch ("https://bzhdev18.alwaysdata.net/social/?format=" + text).then (rep => rep.json()).then (data => {
 				if (data.error)
-					reject (url);
+					reject (text);
 				else
 					resolve (data.text);
 			}).catch (e => {
 				console.log (e);
-				reject (url);
+				reject (text);
 			});
 		});
 	}
